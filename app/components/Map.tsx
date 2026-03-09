@@ -39,13 +39,15 @@ interface ModeInfo { label: string; hint: string; dotColor: string; dotColor2?: 
 const MODE_INFO: Record<MapMode, ModeInfo> = {
   "uvi":      { label: "UVI Only",    hint: "click: add Yield",   dotColor: "#0D9488" },
   "uvi+yield":{ label: "UVI + Yield", hint: "click: Yield Only",  dotColor: "#0D9488", dotColor2: "#059669" },
-  "yield":    { label: "Yield Only",  hint: "click: UVI Only",    dotColor: "#059669" },
+  "yield":    { label: "Yield Only",  hint: "click: X-Ray",       dotColor: "#059669" },
+  "xray":     { label: "X-Ray Mode",  hint: "click: UVI Only",    dotColor: "#94A3B8" },
 };
 
 const MODE_CYCLE: Record<MapMode, MapMode> = {
   "uvi": "uvi+yield",
   "uvi+yield": "yield",
-  "yield": "uvi",
+  "yield": "xray",
+  "xray": "uvi",
 };
 
 interface Props {
@@ -260,9 +262,21 @@ export default function Map({
       map.setPaintProperty(LAYER_FILL, "fill-color", YIELD_COLOR_EXPR);
       map.setPaintProperty(LAYER_FILL, "fill-opacity", 0.55);
       map.setLayoutProperty(LAYER_SYMBOLS, "visibility", "none");
+    } else if (mapMode === "xray") {
+      map.setPaintProperty(LAYER_FILL, "fill-color", "#FFFFFF");
+      map.setPaintProperty(LAYER_FILL, "fill-opacity", 0.12);
+      map.setPaintProperty(LAYER_OUTLINE, "line-color", "#9CA3AF");
+      map.setPaintProperty(LAYER_OUTLINE, "line-opacity", 0.7);
+      map.setPaintProperty(LAYER_ENRICHED, "line-color", "#9CA3AF");
+      map.setPaintProperty(LAYER_ENRICHED, "line-opacity", 0.7);
+      map.setLayoutProperty(LAYER_SYMBOLS, "visibility", "none");
     } else {
       map.setPaintProperty(LAYER_FILL, "fill-color", TEAL);
       map.setPaintProperty(LAYER_FILL, "fill-opacity", UVI_OPACITY_EXPR);
+      map.setPaintProperty(LAYER_OUTLINE, "line-color", TEAL);
+      map.setPaintProperty(LAYER_OUTLINE, "line-opacity", 0.35);
+      map.setPaintProperty(LAYER_ENRICHED, "line-color", "#D97706");
+      map.setPaintProperty(LAYER_ENRICHED, "line-opacity", 0.9);
       map.setLayoutProperty(
         LAYER_SYMBOLS,
         "visibility",

@@ -1,4 +1,4 @@
-export type MapMode = "uvi" | "uvi+yield" | "yield";
+export type MapMode = "uvi" | "uvi+yield" | "yield" | "xray";
 
 export interface HexProperties {
   h3_index: string;

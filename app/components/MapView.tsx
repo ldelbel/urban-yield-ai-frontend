@@ -11,7 +11,19 @@ import SplashBanner from "./SplashBanner";
 
 // Map and QuadrantView must be client-only (no SSR)
 const Map = dynamic(() => import("./Map"), { ssr: false });
+
 const QuadrantView = dynamic(() => import("./QuadrantView"), { ssr: false });
+
+const LOADING_PHRASES = [
+  "Aggregating spatial data...",
+  "Calculating Urban Yield Index...",
+  "Cross-referencing zoning laws...",
+  "Rendering civic infrastructure...",
+  "Finalizing topographical grid...",
+  "Indexing H3 hexagonal tiles...",
+  "Loading municipal datasets...",
+  "Applying scoring algorithms...",
+];
 
 export default function MapView() {
   const [geojson, setGeojson] = useState<HexGeoJSON | null>(null);
@@ -20,9 +32,19 @@ export default function MapView() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [mapMode, setMapMode] = useState<MapMode>("uvi+yield");
+  const [mapMode, setMapMode] = useState<MapMode>("uvi");
   const [isAnalysisMode, setIsAnalysisMode] = useState(false);
+  const [loadingPhraseIdx, setLoadingPhraseIdx] = useState(0);
   const mapInstanceRef = useRef<MapLibreMap | null>(null);
+
+  // Cycle loading phrases every 2 s while data is being fetched; auto-clears on load.
+  useEffect(() => {
+    if (geojson) return;
+    const id = setInterval(() => {
+      setLoadingPhraseIdx(i => (i + 1) % LOADING_PHRASES.length);
+    }, 2000);
+    return () => clearInterval(id);
+  }, [geojson]);
 
   useEffect(() => {
     Promise.all([fetchHexagons(), fetchAlerts()])
@@ -115,7 +137,7 @@ export default function MapView() {
   }, [geojson]);
 
   const handleCycleMode = useCallback(() => {
-    const cycle: Record<MapMode, MapMode> = { "uvi": "uvi+yield", "uvi+yield": "yield", "yield": "uvi" };
+    const cycle: Record<MapMode, MapMode> = { "uvi": "uvi+yield", "uvi+yield": "yield", "yield": "xray", "xray": "uvi" };
     setMapMode(prev => cycle[prev]);
   }, []);
 
@@ -177,10 +199,26 @@ export default function MapView() {
       >
         <div className="text-center">
           <div
-            className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-3"
+            className="w-8 h-8 border-2 rounded-full animate-spin mx-auto mb-4"
             style={{ borderColor: "#D97706", borderTopColor: "transparent" }}
           />
-          <p className="text-sm" style={{ color: "#78716C" }}>Loading hexagon data…</p>
+          <p
+            className="text-xs font-semibold tracking-widest uppercase mb-2"
+            style={{ color: "#A8A29E", letterSpacing: "0.12em" }}
+          >
+            Urban Yield AI
+          </p>
+          <p
+            key={loadingPhraseIdx}
+            className="text-sm"
+            style={{
+              color: "#78716C",
+              minWidth: "240px",
+              animation: "fadeInUp 0.4s ease both",
+            }}
+          >
+            {LOADING_PHRASES[loadingPhraseIdx]}
+          </p>
         </div>
       </div>
     );
