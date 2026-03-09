@@ -1,0 +1,266 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import type { HexProperties } from "../types";
+import { fmt, fetchInsight } from "../lib/api";
+
+interface Props {
+  cell: HexProperties;
+  onClose: () => void;
+}
+
+const PENDING = "Data pending city review";
+
+function DiagnosisBadge({ label }: { label: HexProperties["yield_label"] }) {
+  const styles: Record<string, string> = {
+    Accelerating: "bg-emerald-500",
+    Stable: "bg-blue-500",
+    Stagnating: "bg-red-500",
+    "Low Confidence": "bg-gray-500",
+    "Structurally Constrained — Flood Zone": "bg-purple-600",
+    "Structurally Constrained — Historic District": "bg-purple-600",
+    "Structurally Constrained — Flood + Historic": "bg-purple-600",
+  };
+  const bg = styles[label ?? ""] ?? "bg-gray-500";
+  return (
+    <div
+      className={`${bg} text-white text-center font-bold`}
+      style={{ fontSize: "1.125rem", borderRadius: "6px", padding: "10px 16px" }}
+    >
+      {label ?? "Unknown"}
+    </div>
+  );
+}
+
+function Flag({ active, label, color }: { active: boolean; label: string; color: string }) {
+  if (!active) return null;
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold ${color}`}>
+      {label}
+    </span>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string | number | null | undefined }) {
+  const display = value == null ? PENDING : String(value);
+  const isPending = display === PENDING;
+  return (
+    <div className="flex justify-between items-baseline gap-4 py-1 border-b border-gray-100 last:border-0">
+      <span className="text-xs text-gray-500 shrink-0">{label}</span>
+      <span className={`text-[0.85rem] font-medium text-right ${isPending ? "text-gray-400 italic" : "text-gray-800"}`}>
+        {display}
+      </span>
+    </div>
+  );
+}
+
+function NarrativeView({ text }: { text: string }) {
+  const sections = [
+    { key: "SITUATION:", color: "text-blue-700" },
+    { key: "ROOT CAUSE:", color: "text-gray-700" },
+    { key: "RECOMMENDED ACTION:", color: "text-amber-800" },
+  ];
+
+  const parts: { label: string; content: string; isAction: boolean }[] = [];
+  let remaining = text;
+  for (const { key, color: _color } of sections) {
+    const idx = remaining.indexOf(key);
+    if (idx === -1) continue;
+    const afterKey = remaining.slice(idx + key.length).trim();
+    const nextIdx = sections
+      .map((s) => afterKey.indexOf(s.key))
+      .filter((i) => i > 0)
+      .reduce((min, i) => Math.min(min, i), Infinity);
+    const content = isFinite(nextIdx) ? afterKey.slice(0, nextIdx).trim() : afterKey;
+    parts.push({ label: key.replace(":", ""), content, isAction: key === "RECOMMENDED ACTION:" });
+    remaining = remaining.slice(idx + key.length);
+  }
+
+  if (parts.length === 0) {
+    return <p className="text-xs text-blue-900 leading-relaxed">{text}</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      {parts.map(({ label, content, isAction }) => (
+        <div
+          key={label}
+          className={isAction ? "border-l-2 border-amber-400 pl-3 bg-amber-50 rounded-r py-1" : ""}
+        >
+          <p className="text-xs tracking-widest uppercase font-semibold text-gray-500 mb-0.5">{label}</p>
+          <p className="text-xs text-gray-800 leading-relaxed">{content}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function extractSection(text: string, key: string): string {
+  const ALL_KEYS = ["SITUATION:", "ROOT CAUSE:", "RECOMMENDED ACTION:"];
+  const idx = text.indexOf(key);
+  if (idx === -1) return "";
+  const after = text.slice(idx + key.length).trim();
+  const nextIdx = ALL_KEYS
+    .filter(k => k !== key)
+    .map(k => after.indexOf(k))
+    .filter(i => i > 0)
+    .reduce((min, i) => Math.min(min, i), Infinity);
+  return isFinite(nextIdx) ? after.slice(0, nextIdx).trim() : after;
+}
+
+export default function HexPopup({ cell, onClose }: Props) {
+  const [narrative, setNarrative] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    setNarrative(null);
+  }, [cell.h3_index]);
+
+  async function loadInsight() {
+    setLoading(true);
+    try {
+      const text = await fetchInsight(cell.h3_index);
+      setNarrative(text);
+    } catch {
+      setNarrative("Insight unavailable.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCopyBrief() {
+    if (!narrative) return;
+    const actionText = extractSection(narrative, "RECOMMENDED ACTION:");
+    if (!actionText) return;
+    const brief = [
+      "URBAN YIELD AI — ACTION BRIEF",
+      `Zone: ${cell.h3_index}`,
+      `Zoning: ${cell.primary_zoning ?? "N/A"}`,
+      `Status: ${cell.yield_label ?? "N/A"}`,
+      `UVI Score: ${cell.uvi_score?.toFixed(1) ?? "—"} | Yield Score: ${cell.yield_score?.toFixed(3) ?? "—"}`,
+      "",
+      "RECOMMENDED ACTION:",
+      actionText,
+      "",
+      "Generated by Urban Yield AI · City of Montgomery, AL",
+    ].join("\n");
+    await navigator.clipboard.writeText(brief);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  const isEnriched = cell.zillow_avg_price_sqft != null || cell.gmaps_avg_rating != null;
+
+  return (
+    <div className={[
+      "z-20 bg-white shadow-2xl border border-gray-200",
+      // Desktop: absolute panel top-right
+      "md:absolute md:top-4 md:right-4 md:w-80 md:rounded-xl md:overflow-hidden",
+      // Mobile: fixed bottom sheet
+      "fixed bottom-0 left-0 right-0 max-h-[60vh] overflow-y-auto rounded-t-xl",
+    ].join(" ")}>
+      {/* Header */}
+      <div className="bg-gray-900 text-white px-4 py-3 flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-mono text-gray-400 mb-1">{cell.h3_index}</p>
+          {/* TIER 1: Diagnosis badge */}
+          <DiagnosisBadge label={cell.yield_label} />
+          <div className="flex flex-wrap gap-1 mt-2">
+            {isEnriched && (
+              <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-amber-400 text-gray-900">
+                Market Data Available
+              </span>
+            )}
+            <Flag active={cell.is_infrastructure_priority} label="⚠ Infrastructure Alert" color="bg-orange-100 text-orange-800" />
+            <Flag active={cell.is_infill_opportunity} label="◆ Infill Opportunity" color="bg-purple-100 text-purple-800" />
+            <Flag active={cell.is_flood_zone} label="⚠ Flood Zone" color="bg-orange-200 text-orange-900" />
+            <Flag active={cell.is_historic_district} label="🏛 Historic District" color="bg-indigo-100 text-indigo-800" />
+          </div>
+        </div>
+        <button onClick={onClose} className="text-gray-400 hover:text-white text-lg leading-none mt-0.5 shrink-0">✕</button>
+      </div>
+
+      {/* TIER 1: Scores */}
+      <div className="grid grid-cols-2 divide-x divide-gray-100 bg-gray-50">
+        <div className="px-4 py-3 text-center">
+          <p className="text-4xl font-bold text-gray-800">{cell.uvi_score?.toFixed(1) ?? "—"}</p>
+          <p className="text-xs text-gray-500">UVI Score</p>
+        </div>
+        <div className="px-4 py-3 text-center">
+          <p className="text-4xl font-bold text-gray-800">{cell.yield_score?.toFixed(3) ?? "—"}</p>
+          <p className="text-xs text-gray-500">Yield Score</p>
+        </div>
+      </div>
+
+      <hr className="border-gray-200" />
+
+      {/* TIER 2: Market Signals */}
+      <div className="px-4 py-2">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Market Signals</p>
+        <Row label="Price / sqft" value={cell.zillow_avg_price_sqft != null ? `$${cell.zillow_avg_price_sqft.toFixed(0)}` : null} />
+        <Row label="Google Maps Rating" value={cell.gmaps_avg_rating != null ? `${cell.gmaps_avg_rating.toFixed(2)} ★` : null} />
+        <Row label="Primary Zoning" value={cell.primary_zoning} />
+      </div>
+
+      {/* TIER 3: Activity (collapsible) */}
+      <div className="px-4 py-2">
+        <details className="mt-2">
+          <summary className="text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer select-none py-1">
+            Activity Details ▸
+          </summary>
+          <Row label="Building Permits" value={`${cell.permit_count} total, ${cell.active_permit_count} active`} />
+          <Row label="Active Businesses" value={cell.business_count} />
+          <Row label="Vacant Parcels" value={cell.vacant_count} />
+          <Row label="Code / 311 Cases" value={cell.service_request_count} />
+          <Row label="Chronic Cases (180d+)" value={cell.chronic_case_count > 0 ? cell.chronic_case_count : null} />
+          {cell.dominant_311_type_breakdown && Object.keys(cell.dominant_311_type_breakdown).length > 0 && (
+            <div className="py-1 border-b border-gray-100">
+              <span className="text-xs text-gray-500">Issue Breakdown</span>
+              <div className="mt-1 space-y-0.5">
+                {Object.entries(cell.dominant_311_type_breakdown)
+                  .sort(([, a], [, b]) => b - a)
+                  .slice(0, 5)
+                  .map(([type, count]) => (
+                    <div key={type} className="flex justify-between text-xs">
+                      <span className="text-gray-600 truncate mr-2">{type}</span>
+                      <span className="font-medium text-gray-800 shrink-0">{count}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+          <Row
+            label="Declared Investment"
+            value={cell.total_declared_value != null ? fmt(cell.total_declared_value, "$") : null}
+          />
+        </details>
+      </div>
+
+      {/* AI Narrative */}
+      <div className="px-4 pb-4">
+        {narrative ? (
+          <div className="mt-2 p-3 bg-blue-50 rounded-lg">
+            <NarrativeView text={narrative} />
+            {narrative && extractSection(narrative, "RECOMMENDED ACTION:") && (
+              <button
+                onClick={handleCopyBrief}
+                className="mt-2 text-xs border border-amber-400 text-amber-600 px-2.5 py-1 rounded hover:bg-amber-50 transition-colors"
+              >
+                {copied ? "✓ Copied!" : "📋 Copy Action Brief"}
+              </button>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={loadInsight}
+            disabled={loading}
+            className="mt-2 w-full py-2 rounded-lg text-xs font-semibold bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-50 transition-colors"
+          >
+            {loading ? "Generating insight…" : "View AI Briefing"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}

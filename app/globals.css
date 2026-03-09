@@ -1,26 +1,65 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #F5F0EB;
+  --foreground: #1C1917;
+  --sidebar-bg: #F8F6F2;
+  --border-color: #E2D9CF;
+  --text-secondary: #78716C;
+  --accent: #D97706;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans, Arial, Helvetica, sans-serif);
+}
+
+/* ── Pulse animation for header stats ─────────────────────────── */
+@keyframes pulse-opacity {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+@layer utilities {
+  .animate-pulse-opacity {
+    animation: pulse-opacity 2s ease-in-out infinite;
+  }
+}
+
+/* ── Bottom sheet responsive max-height ───────────────────────── */
+.bottom-sheet {
+  max-height: 320px;
+}
+@media (max-width: 768px) {
+  .bottom-sheet {
+    max-height: 70vh;
+  }
+}
+
+/* ── MapLibre navigation controls — light theme override ──────── */
+.maplibregl-ctrl-group {
+  border: 1px solid #E2D9CF !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+.maplibregl-ctrl-group button {
+  background-color: #FFFFFF !important;
+  color: #1C1917 !important;
+}
+.maplibregl-ctrl-group button:hover {
+  background-color: #FEF3C7 !important;
+}
+.maplibregl-ctrl-group button + button {
+  border-top: 1px solid #E2D9CF !important;
+}
+
+/* MapLibre attribution — light theme */
+.maplibregl-ctrl-attrib {
+  background: rgba(248, 246, 242, 0.9) !important;
+  color: #78716C !important;
+  font-size: 10px !important;
+}
+.maplibregl-ctrl-attrib a {
+  color: #D97706 !important;
 }
