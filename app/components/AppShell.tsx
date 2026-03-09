@@ -1,20 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import MapView from "./MapView";
 import DocsTab from "./DocsTab";
 import PitchTab from "./PitchTab";
 
 type Tab = "map" | "docs" | "pitch";
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "map", label: "Map" },
-  { id: "docs", label: "Docs" },
-  { id: "pitch", label: "Pitch" },
+const TABS: { id: Tab; label: string; path: string }[] = [
+  { id: "map",   label: "Map",   path: "/" },
+  { id: "docs",  label: "Docs",  path: "/docs" },
+  { id: "pitch", label: "Pitch", path: "/pitch" },
 ];
 
+function pathnameToTab(pathname: string): Tab {
+  if (pathname === "/docs")  return "docs";
+  if (pathname === "/pitch") return "pitch";
+  return "map";
+}
+
 export default function AppShell() {
-  const [tab, setTab] = useState<Tab>("map");
+  const router   = useRouter();
+  const pathname = usePathname();
+  const tab      = pathnameToTab(pathname);
 
   return (
     <div className="flex flex-col h-screen" style={{ background: "#F5F0EB" }}>
@@ -23,29 +31,28 @@ export default function AppShell() {
         className="flex items-center gap-6 px-6 shrink-0"
         style={{ height: 44, background: "#F5F0EB", borderBottom: "1px solid #E2D9CF" }}
       >
-        {TABS.map(({ id, label }) => (
-          <button
+        {TABS.map(({ id, label, path }) => (
+          <a
             key={id}
-            onClick={() => setTab(id)}
+            href={path}
+            onClick={(e) => { e.preventDefault(); router.push(path); }}
             style={{
               fontSize: 13,
               fontWeight: 600,
               textTransform: "uppercase",
               letterSpacing: "0.05em",
               color: tab === id ? "#1C1917" : "#78716C",
-              borderBottom: tab === id ? "2px solid #D97706" : "2px solid transparent",
-              paddingBottom: 2,
-              background: "none",
-              border: "none",
               borderBottomStyle: "solid",
               borderBottomWidth: 2,
               borderBottomColor: tab === id ? "#D97706" : "transparent",
+              paddingBottom: 2,
+              textDecoration: "none",
               cursor: "pointer",
               lineHeight: "44px",
             }}
           >
             {label}
-          </button>
+          </a>
         ))}
       </nav>
 
@@ -56,7 +63,7 @@ export default function AppShell() {
           <MapView />
         </div>
 
-        {tab === "docs" && <DocsTab />}
+        {tab === "docs"  && <DocsTab />}
         {tab === "pitch" && <PitchTab />}
       </div>
     </div>

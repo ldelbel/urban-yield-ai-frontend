@@ -142,7 +142,7 @@ export default function Map({
         filter: ["==", ["typeof", ["get", "zillow_avg_price_sqft"]], "number"],
         paint: {
           "line-color": "#D97706",
-          "line-width": 2.5,
+          "line-width": 1.2,
           "line-opacity": 0.9,
         },
       });
