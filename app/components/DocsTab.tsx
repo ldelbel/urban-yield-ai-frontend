@@ -60,6 +60,8 @@ const DATA_SOURCE_ROWS = [
   { name: "Zoning", type: "ArcGIS FeatureServer", detail: "Zoning_HN/FeatureServer/0 (async batched spatial queries)" },
   { name: "Census ACS (5-yr)", type: "Census Bureau API", detail: "2022 ACS — income, home value, rent, population, vacancy rate" },
   { name: "Census Tract Boundaries", type: "TIGERweb REST", detail: "EPSG:4326, 100 records/page, used for spatial join" },
+  { name: "Zillow (via BrightData)", type: "BrightData MCP", detail: "avg price/sqft, days on market, price reduction count — powers Market signal" },
+  { name: "Google Maps (via BrightData)", type: "BrightData MCP", detail: "avg rating, review count, permanently closed count — powers Sentiment signal" },
 ];
 
 const sections: Section[] = [
@@ -114,13 +116,6 @@ const sections: Section[] = [
     title: "Data Sources",
     content: (
       <div>
-        <p style={{ color: "#44403C", fontSize: 14, marginBottom: 12 }}>
-          9 ingestors run concurrently in Phase 1 of the pipeline via{" "}
-          <code style={{ background: "#F8F6F2", padding: "1px 4px", borderRadius: 3, fontSize: 12 }}>
-            asyncio.gather
-          </code>
-          .
-        </p>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
