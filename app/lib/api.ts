@@ -54,6 +54,27 @@ export function getYieldSymbol(yieldLabel: string | null | undefined): string {
   return "?";
 }
 
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  initialDelayMs = 2000
+): Promise<T> {
+  let lastError: unknown;
+  let delay = initialDelayMs;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxRetries) {
+        await new Promise(res => setTimeout(res, delay));
+        delay *= 2; // 2 s → 4 s → 8 s
+      }
+    }
+  }
+  throw lastError;
+}
+
 export function yieldColor(label: HexProperties["yield_label"], enriched: boolean): string {
   if (enriched) return "#D97706"; // amber — enriched (higher contrast on light basemap)
   switch (label) {

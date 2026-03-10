@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import type { Map as MapLibreMap } from "maplibre-gl";
 import type { HexGeoJSON, HexProperties, AlertsResponse, MapMode } from "../types";
-import { fetchHexagons, fetchAlerts, getYieldSymbol } from "../lib/api";
+import { fetchHexagons, fetchAlerts, getYieldSymbol, withRetry } from "../lib/api";
 import Sidebar from "./Sidebar";
 import BottomSheet from "./BottomSheet";
 import SplashBanner from "./SplashBanner";
@@ -35,6 +35,7 @@ export default function MapView() {
   const [mapMode, setMapMode] = useState<MapMode>("uvi");
   const [isAnalysisMode, setIsAnalysisMode] = useState(false);
   const [loadingPhraseIdx, setLoadingPhraseIdx] = useState(0);
+  const [isColdStart, setIsColdStart] = useState(false);
   const mapInstanceRef = useRef<MapLibreMap | null>(null);
 
   // Cycle loading phrases every 2 s while data is being fetched; auto-clears on load.
@@ -47,8 +48,17 @@ export default function MapView() {
   }, [geojson]);
 
   useEffect(() => {
-    Promise.all([fetchHexagons(), fetchAlerts()])
+    let cancelled = false;
+
+    // Cold start detection — flip message after 5 s if data hasn't arrived yet
+    const coldStartTimer = setTimeout(() => {
+      if (!cancelled) setIsColdStart(true);
+    }, 5000);
+
+    withRetry(() => Promise.all([fetchHexagons(), fetchAlerts()]), 3, 2000)
       .then(([geo, al]) => {
+        if (cancelled) return;
+        clearTimeout(coldStartTimer);
         // Graceful fallback: if uvi_rank is missing from the API response,
         // compute it client-side by sorting features by uvi_score descending.
         const hasMissingRank = geo.features.some(
@@ -81,7 +91,16 @@ export default function MapView() {
         setGeojson(geo);
         setAlerts(al);
       })
-      .catch(e => setError(String(e)));
+      .catch(e => {
+        if (cancelled) return;
+        clearTimeout(coldStartTimer);
+        setError(String(e)); // only reached after all 4 attempts fail
+      });
+
+    return () => {
+      cancelled = true;
+      clearTimeout(coldStartTimer);
+    };
   }, []);
 
   const handleSelectHex = useCallback((props: HexProperties) => {
@@ -209,7 +228,7 @@ export default function MapView() {
             Urban Yield AI
           </p>
           <p
-            key={loadingPhraseIdx}
+            key={isColdStart ? "cold" : loadingPhraseIdx}
             className="text-sm"
             style={{
               color: "#78716C",
@@ -217,7 +236,9 @@ export default function MapView() {
               animation: "fadeInUp 0.4s ease both",
             }}
           >
-            {LOADING_PHRASES[loadingPhraseIdx]}
+            {isColdStart
+              ? "Waking up the simulation engine\u2026 this might take a few seconds on the first run."
+              : LOADING_PHRASES[loadingPhraseIdx]}
           </p>
         </div>
       </div>
